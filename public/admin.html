@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Voting System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Admin Panel</h1>
+            <p>Election management and controls</p>
+        </header>
+
+        <nav>
+            <a href="/" class="nav-link">Vote</a>
+            <a href="/results" class="nav-link">Results</a>
+            <a href="/admin" class="nav-link active">Admin</a>
+        </nav>
+
+        <main>
+            <div class="admin-section">
+                <div class="admin-card">
+                    <h2>Election Status</h2>
+                    <div id="election-status">
+                        <div class="status-item">
+                            <span class="status-label">Total Votes:</span>
+                            <span id="admin-vote-count" class="status-value">0</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Unique Voters:</span>
+                            <span id="unique-voters" class="status-value">0</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Election Status:</span>
+                            <span class="status-value status-active">Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <h2>Quick Results Overview</h2>
+                    <div id="admin-results">
+                        <!-- Quick results will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <h2>Election Controls</h2>
+                    <div class="admin-controls">
+                        <button id="refresh-data" class="admin-btn refresh">
+                            🔄 Refresh Data
+                        </button>
+                        <button id="reset-votes" class="admin-btn danger">
+                            🗑️ Reset All Votes
+                        </button>
+                        <button id="export-results" class="admin-btn export">
+                            📊 Export Results
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-card">
+                    <h2>System Information</h2>
+                    <div class="system-info">
+                        <div class="info-item">
+                            <span class="info-label">Server:</span>
+                            <span class="info-value">Running on Port 3000</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Last Updated:</span>
+                            <span id="last-updated" class="info-value">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Auto-refresh:</span>
+                            <span class="info-value">Every 5 seconds</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="admin-message" class="message"></div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Election Voting System - Admin Panel</p>
+        </footer>
+    </div>
+
+    <script>
+        // Load admin data when page loads
+        document.addEventListener('DOMContentLoaded', loadAdminData);
+
+        // Auto-refresh every 5 seconds
+        setInterval(loadAdminData, 5000);
+
+        // Event listeners
+        document.getElementById('refresh-data').addEventListener('click', loadAdminData);
+        document.getElementById('reset-votes').addEventListener('click', resetVotes);
+        document.getElementById('export-results').addEventListener('click', exportResults);
+
+        async function loadAdminData() {
+            try {
+                const response = await fetch('/api/votes');
+                const results = await response.json();
+                
+                displayAdminResults(results);
+                updateLastUpdated();
+
+            } catch (error) {
+                console.error('Error loading admin data:', error);
+                showAdminMessage('Error loading data: ' + error.message, 'error');
+            }
+        }
+
+        function displayAdminResults(results) {
+            const totalVotes = results.reduce((sum, candidate) => sum + candidate.votes, 0);
+            
+            // Update status
+            document.getElementById('admin-vote-count').textContent = totalVotes;
+            document.getElementById('unique-voters').textContent = totalVotes; // In this simple system, 1 vote = 1 voter
+
+            // Sort candidates by votes
+            results.sort((a, b) => b.votes - a.votes);
+
+            // Display quick results
+            const adminResults = document.getElementById('admin-results');
+            adminResults.innerHTML = '';
+
+            if (totalVotes === 0) {
+                adminResults.innerHTML = '<p class="no-data">No votes cast yet</p>';
+                return;
+            }
+
+            results.forEach((candidate, index) => {
+                const percentage = ((candidate.votes / totalVotes) * 100).toFixed(1);
+                const isLeading = index === 0;
+
+                const resultItem = document.createElement('div');
+                resultItem.className = `admin-result-item ${isLeading ? 'leading' : ''}`;
+                resultItem.innerHTML = `
+                    <span class="candidate-name">${candidate.name}</span>
+                    <span class="vote-info">${candidate.votes} votes (${percentage}%)</span>
+                `;
+                adminResults.appendChild(resultItem);
+            });
+        }
+
+        async function resetVotes() {
+            if (!confirm('Are you sure you want to reset all votes? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAdminMessage(result.message, 'success');
+                    loadAdminData(); // Refresh data
+                } else {
+                    showAdminMessage('Failed to reset votes', 'error');
+                }
+
+            } catch (error) {
+                showAdminMessage('Error resetting votes: ' + error.message, 'error');
+            }
+        }
+
+        async function exportResults() {
+            try {
+                const response = await fetch('/api/votes');
+                const results = await response.json();
+                
+                const totalVotes = results.reduce((sum, candidate) => sum + candidate.votes, 0);
+                
+                let exportData = 'Election Results Export\n';
+                exportData += '========================\n\n';
+                exportData += `Total Votes: ${totalVotes}\n`;
+                exportData += `Export Date: ${new Date().toLocaleString()}\n\n`;
+                exportData += 'Results:\n';
+                exportData += '--------\n';
+
+                results.sort((a, b) => b.votes - a.votes);
+                
+                results.forEach((candidate, index) => {
+                    const percentage = totalVotes > 0 ? ((candidate.votes / totalVotes) * 100).toFixed(1) : 0;
+                    exportData += `${index + 1}. ${candidate.name} (${candidate.party}): ${candidate.votes} votes (${percentage}%)\n`;
+                });
+
+                // Create and download file
+                const blob = new Blob([exportData], { type: 'text/plain' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `election_results_${new Date().toISOString().split('T')[0]}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                showAdminMessage('Results exported successfully!', 'success');
+
+            } catch (error) {
+                showAdminMessage('Error exporting results: ' + error.message, 'error');
+            }
+        }
+
+        function updateLastUpdated() {
+            document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+        }
+
+        function showAdminMessage(text, type) {
+            const messageDiv = document.getElementById('admin-message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

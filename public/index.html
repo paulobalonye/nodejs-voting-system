@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Election Voting System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗳️ Election Voting System</h1>
+            <p>Cast your vote for the next leader</p>
+        </header>
+
+        <nav>
+            <a href="/" class="nav-link active">Vote</a>
+            <a href="/results" class="nav-link">Results</a>
+            <a href="/admin" class="nav-link">Admin</a>
+        </nav>
+
+        <main>
+            <div id="voting-section">
+                <h2>Select Your Candidate</h2>
+                <div id="candidates-list">
+                    <!-- Candidates will be loaded here -->
+                </div>
+                
+                <div id="vote-button-container" style="display: none;">
+                    <button id="submit-vote" class="vote-btn">Cast Your Vote</button>
+                </div>
+            </div>
+
+            <div id="message" class="message"></div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Election Voting System - Secure & Transparent</p>
+        </footer>
+    </div>
+
+    <script>
+        let selectedCandidate = null;
+
+        // Load candidates when page loads
+        document.addEventListener('DOMContentLoaded', loadCandidates);
+
+        async function loadCandidates() {
+            try {
+                const response = await fetch('/api/candidates');
+                const candidates = await response.json();
+                
+                const candidatesList = document.getElementById('candidates-list');
+                candidatesList.innerHTML = '';
+
+                candidates.forEach(candidate => {
+                    const candidateCard = document.createElement('div');
+                    candidateCard.className = 'candidate-card';
+                    candidateCard.innerHTML = `
+                        <input type="radio" id="candidate-${candidate.id}" name="candidate" value="${candidate.id}">
+                        <label for="candidate-${candidate.id}">
+                            <div class="candidate-info">
+                                <h3>${candidate.name}</h3>
+                                <p class="party">${candidate.party}</p>
+                            </div>
+                        </label>
+                    `;
+                    candidatesList.appendChild(candidateCard);
+                });
+
+                // Add event listeners to radio buttons
+                document.querySelectorAll('input[name="candidate"]').forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        selectedCandidate = this.value;
+                        document.getElementById('vote-button-container').style.display = 'block';
+                        
+                        // Update visual selection
+                        document.querySelectorAll('.candidate-card').forEach(card => {
+                            card.classList.remove('selected');
+                        });
+                        this.closest('.candidate-card').classList.add('selected');
+                    });
+                });
+
+            } catch (error) {
+                showMessage('Error loading candidates: ' + error.message, 'error');
+            }
+        }
+
+        // Handle vote submission
+        document.getElementById('submit-vote').addEventListener('click', async function() {
+            if (!selectedCandidate) {
+                showMessage('Please select a candidate before voting!', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/vote', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ candidateId: parseInt(selectedCandidate) })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    // Disable voting after successful vote
+                    document.getElementById('voting-section').style.display = 'none';
+                    setTimeout(() => {
+                        window.location.href = '/results';
+                    }, 2000);
+                } else {
+                    showMessage(result.message, 'error');
+                }
+
+            } catch (error) {
+                showMessage('Error submitting vote: ' + error.message, 'error');
+            }
+        });
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

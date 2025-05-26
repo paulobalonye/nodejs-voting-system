@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Election Results - Voting System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Election Results</h1>
+            <p>Live voting results and statistics</p>
+        </header>
+
+        <nav>
+            <a href="/" class="nav-link">Vote</a>
+            <a href="/results" class="nav-link active">Results</a>
+            <a href="/admin" class="nav-link">Admin</a>
+        </nav>
+
+        <main>
+            <div class="results-section">
+                <div class="results-header">
+                    <h2>Current Results</h2>
+                    <button id="refresh-results" class="refresh-btn">🔄 Refresh</button>
+                </div>
+
+                <div id="total-votes" class="total-votes">
+                    Total Votes Cast: <span id="vote-count">0</span>
+                </div>
+
+                <div id="results-container">
+                    <!-- Results will be loaded here -->
+                </div>
+
+                <div class="results-chart">
+                    <h3>Vote Distribution</h3>
+                    <div id="chart-container">
+                        <!-- Simple bar chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Election Voting System - Secure & Transparent</p>
+        </footer>
+    </div>
+
+    <script>
+        // Load results when page loads
+        document.addEventListener('DOMContentLoaded', loadResults);
+
+        // Refresh button event listener
+        document.getElementById('refresh-results').addEventListener('click', loadResults);
+
+        // Auto-refresh every 10 seconds
+        setInterval(loadResults, 10000);
+
+        async function loadResults() {
+            try {
+                const response = await fetch('/api/votes');
+                const results = await response.json();
+                
+                displayResults(results);
+                displayChart(results);
+
+            } catch (error) {
+                console.error('Error loading results:', error);
+                document.getElementById('results-container').innerHTML = 
+                    '<p class="error">Error loading results. Please try again.</p>';
+            }
+        }
+
+        function displayResults(results) {
+            const totalVotes = results.reduce((sum, candidate) => sum + candidate.votes, 0);
+            document.getElementById('vote-count').textContent = totalVotes;
+
+            // Sort candidates by votes (descending)
+            results.sort((a, b) => b.votes - a.votes);
+
+            const container = document.getElementById('results-container');
+            container.innerHTML = '';
+
+            results.forEach((candidate, index) => {
+                const percentage = totalVotes > 0 ? ((candidate.votes / totalVotes) * 100).toFixed(1) : 0;
+                const isWinner = index === 0 && candidate.votes > 0;
+
+                const resultCard = document.createElement('div');
+                resultCard.className = `result-card ${isWinner ? 'winner' : ''}`;
+                resultCard.innerHTML = `
+                    <div class="candidate-result">
+                        <div class="candidate-info">
+                            <h3>${candidate.name} ${isWinner ? '👑' : ''}</h3>
+                            <p class="party">${candidate.party}</p>
+                        </div>
+                        <div class="vote-stats">
+                            <div class="vote-count">${candidate.votes} votes</div>
+                            <div class="percentage">${percentage}%</div>
+                        </div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percentage}%"></div>
+                    </div>
+                `;
+                container.appendChild(resultCard);
+            });
+
+            if (totalVotes === 0) {
+                container.innerHTML = '<div class="no-votes">No votes have been cast yet.</div>';
+            }
+        }
+
+        function displayChart(results) {
+            const chartContainer = document.getElementById('chart-container');
+            chartContainer.innerHTML = '';
+
+            const totalVotes = results.reduce((sum, candidate) => sum + candidate.votes, 0);
+
+            if (totalVotes === 0) {
+                chartContainer.innerHTML = '<p class="no-data">No data to display</p>';
+                return;
+            }
+
+            results.forEach(candidate => {
+                const percentage = ((candidate.votes / totalVotes) * 100).toFixed(1);
+                
+                const barContainer = document.createElement('div');
+                barContainer.className = 'chart-bar-container';
+                barContainer.innerHTML = `
+                    <div class="chart-label">${candidate.name}</div>
+                    <div class="chart-bar">
+                        <div class="chart-bar-fill" style="width: ${percentage}%"></div>
+                        <span class="chart-percentage">${percentage}%</span>
+                    </div>
+                `;
+                chartContainer.appendChild(barContainer);
+            });
+        }
+    </script>
+</body>
+</html>
